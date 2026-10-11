@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TornoLab CNC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=Chakra+Petch:wght@600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<div class="faixa" aria-hidden="true"></div>
+
+<header class="topo">
+  <div class="marca">
+    <span class="marca-nome">TORNOLAB</span><span class="marca-cnc">CNC</span>
+  </div>
+  <p class="marca-sub">Simulador didático de torno · programação ISO padrão Fanuc</p>
+  <div class="topo-dir">
+    <span class="prog-id" id="progId">O0000</span>
+    <div class="estado" id="estadoMaquina" data-estado="pronto" role="status"><span class="led"></span><span id="estadoTexto">Pronto</span></div>
+    <button class="btn" id="btnAjuda" type="button">Como usar</button>
+  </div>
+</header>
+
+<main class="app">
+  <!-- PROGRAMA -->
+  <section class="pane pane-prog" aria-label="Programa CNC">
+    <div class="pane-cab">
+      <span class="rotulo">Programa</span>
+      <label class="sr" for="selExemplo">Exemplos</label>
+      <select id="selExemplo"></select>
+    </div>
+    <div class="prog-acoes">
+      <button class="btn" id="btnNovo" type="button">Novo</button>
+      <button class="btn" id="btnAbrir" type="button">Abrir…</button>
+      <button class="btn" id="btnSalvar" type="button">Baixar .nc</button>
+      <button class="btn" id="btnCopiar" type="button">Copiar</button>
+      <button class="btn btn-ambar" id="btnVerificar" type="button">Verificar</button>
+      <input type="file" id="arquivo" accept=".nc,.txt,.tap,.cnc,.min,.ngc,.iso" hidden>
+    </div>
+    <details class="objetivo" id="objetivo" open>
+      <summary>Sobre este programa</summary>
+      <div id="objetivoTexto"></div>
+    </details>
+    <div class="editor" id="editor">
+      <div class="ed-gutter" aria-hidden="true"></div>
+      <div class="ed-wrap">
+        <pre class="ed-hl" aria-hidden="true"></pre>
+        <textarea class="ed-ta" id="codigo" spellcheck="false" autocomplete="off" autocapitalize="characters" wrap="off" aria-label="Código G do programa"></textarea>
+      </div>
+    </div>
+    <div class="decod" aria-live="polite">
+      <div class="decod-cab"><span class="rotulo">Leitura do bloco</span><span id="decLinha" class="decod-linha"></span></div>
+      <div id="decConteudo" class="decod-corpo"></div>
+    </div>
+  </section>
+
+  <!-- SIMULAÇÃO -->
+  <section class="pane pane-sim" aria-label="Simulação">
+    <div class="pane-cab sim-cab">
+      <div class="seg" role="tablist" aria-label="Tipo de vista">
+        <button role="tab" id="tab2d" aria-selected="true" type="button">Corte 2D</button>
+        <button role="tab" id="tab3d" aria-selected="false" type="button">Peça 3D</button>
+      </div>
+      <div class="vis-opcoes" id="opcoes2d">
+        <label class="chk"><input type="checkbox" id="optPrevista" checked> Trajetória prevista</label>
+        <label class="chk"><input type="checkbox" id="optRastro" checked> Rastro</label>
+        <label class="chk"><input type="checkbox" id="optEfeitos" checked> Cavacos e fluido</label>
+      </div>
+      <div class="zoom" id="zoom2d">
+        <button class="btn btn-sm" id="btnFitPeca" type="button" title="Enquadrar a peça (duplo clique na vista)">Peça</button>
+        <button class="btn btn-sm" id="btnFitTudo" type="button" title="Mostrar todo o percurso">Tudo</button>
+      </div>
+    </div>
+    <div class="viewport" id="viewport">
+      <canvas id="cv2d" aria-label="Vista em corte do torno"></canvas>
+      <canvas id="cv3d" hidden aria-label="Peça em 3D"></canvas>
+      <div class="hud hud-bloco"><span class="rotulo">Bloco</span><code id="hudBloco">—</code></div>
+      <div class="hud hud-legenda" id="hudLegenda">
+        <span><i class="sw sw-rap"></i>G00 rápido</span>
+        <span><i class="sw sw-av"></i>Corte</span>
+        <span><i class="sw sw-ros"></i>Rosca</span>
+      </div>
+      <div class="hud hud-cursor" id="hudCursor" hidden></div>
+      <div class="hud hud-dica3d" id="dica3d" hidden>Arraste para girar · role para aproximar · duplo clique centraliza</div>
+      <div class="alarme" id="alarme" hidden role="alert">
+        <div class="alarme-cab"><strong id="alarmeCod">ALARME</strong><span id="alarmeLinha"></span></div>
+        <p id="alarmeMsg"></p>
+        <div class="alarme-acoes">
+          <button class="btn btn-sm" id="alarmeIr" type="button">Ir para a linha</button>
+          <span>Corrija e pressione <b>RESET</b>.</span>
+        </div>
+      </div>
+    </div>
+    <div class="comando">
+      <div class="grupo">
+        <button class="mbtn mbtn-start" id="btnStart" type="button" title="Ciclo início (Ctrl+Enter)">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>Ciclo início
+        </button>
+        <button class="mbtn mbtn-hold" id="btnHold" type="button" title="Parada de avanço (Esc)">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z"/></svg>Parada
+        </button>
+        <button class="mbtn mbtn-reset" id="btnReset" type="button" title="Reset: volta ao início e restaura a peça bruta">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5h9v9h-9z"/></svg>Reset
+        </button>
+      </div>
+      <div class="grupo">
+        <button class="chave" id="btnBloco" type="button" aria-pressed="false"><span class="led"></span>Bloco a bloco</button>
+        <button class="chave" id="btnM01" type="button" aria-pressed="false"><span class="led"></span>Parada opcional M01</button>
+      </div>
+      <div class="grupo grupo-vel">
+        <label for="velocidade" class="rotulo">Velocidade</label>
+        <input type="range" id="velocidade" min="0" max="9" step="1" value="4">
+        <output id="velTxt" for="velocidade">×2</output>
+      </div>
+      <button class="btn" id="btnFim" type="button" title="Executa tudo sem animação">Ir ao resultado</button>
+    </div>
+    <div class="console" id="console" role="log" aria-live="polite" aria-label="Mensagens da máquina"></div>
+  </section>
+
+  <!-- ESTADO -->
+  <aside class="pane pane-info" aria-label="Estado da máquina">
+    <div class="dro">
+      <div class="dro-cab"><span class="rotulo">Posição · zero-peça</span><span class="dro-ferr" id="droFerr">T0101</span></div>
+      <div class="dro-linha"><span class="eixo">X</span><span class="val" id="droX">0.000</span><span class="un">Ø mm</span></div>
+      <div class="dro-linha"><span class="eixo">Z</span><span class="val" id="droZ">0.000</span><span class="un">mm</span></div>
+      <dl class="dro-grade">
+        <div><dt>Avanço</dt><dd id="droF">—</dd></div>
+        <div><dt>Rotação</dt><dd id="droS">—</dd></div>
+        <div><dt>Vel. de corte</dt><dd id="droVc">—</dd></div>
+        <div><dt>Eixo · fluido</dt><dd id="droFuso">—</dd></div>
+        <div><dt>Tempo</dt><dd id="droTempo">00:00,0</dd></div>
+        <div><dt>Estimado</dt><dd id="droEst">—</dd></div>
+      </dl>
+      <div class="dro-vol"><span>Material removido</span><span id="droVol">0 cm³</span></div>
+    </div>
+    <div class="modais" id="modais" aria-label="Códigos modais ativos"></div>
+    <div class="seg seg-abas" role="tablist" aria-label="Painéis">
+      <button role="tab" data-aba="ferramentas" aria-selected="true" type="button">Ferramentas</button>
+      <button role="tab" data-aba="bruta" aria-selected="false" type="button">Peça bruta</button>
+      <button role="tab" data-aba="calc" aria-selected="false" type="button">Cálculos</button>
+      <button role="tab" data-aba="codigos" aria-selected="false" type="button">Códigos</button>
+    </div>
+    <div class="abas">
+      <div class="aba" id="aba-ferramentas" role="tabpanel"></div>
+
+      <div class="aba" id="aba-bruta" role="tabpanel" hidden>
+        <form id="formBruta" class="form">
+          <div class="campo"><label for="bD">Diâmetro da barra</label><div class="in-un"><input id="bD" type="number" min="6" max="160" step="0.5" required><span>mm</span></div></div>
+          <div class="campo"><label for="bL">Comprimento em balanço</label><div class="in-un"><input id="bL" type="number" min="5" max="200" step="1" required><span>mm</span></div></div>
+          <div class="campo"><label for="bF">Sobremetal na face</label><div class="in-un"><input id="bF" type="number" min="0" max="10" step="0.1" required><span>mm</span></div></div>
+          <div class="campo"><label for="bFuro">Furo prévio (0 = maciço)</label><div class="in-un"><input id="bFuro" type="number" min="0" step="0.5" required><span>Ø mm</span></div></div>
+          <div class="campo campo-largo"><label for="bMat">Material</label><select id="bMat"></select></div>
+          <p class="form-erro" id="brutaErro" hidden></p>
+          <button type="submit" class="btn btn-ambar">Aplicar e reiniciar</button>
+          <p class="nota">O zero-peça (X0 Z0) fica no centro da face acabada. As castanhas da placa começam em <b id="notaPlaca">Z-70</b>; a ferramenta não pode passar daí.</p>
+        </form>
+      </div>
+
+      <div class="aba" id="aba-calc" role="tabpanel" hidden>
+        <div class="calc">
+          <section>
+            <h3>Rotação</h3>
+            <div class="calc-in">
+              <label>Vc <span>m/min</span><input id="cVc" type="number" value="200" min="1"></label>
+              <label>Diâmetro <span>mm</span><input id="cD" type="number" value="50" min="0.1" step="0.1"></label>
+            </div>
+            <p class="calc-out">n = <b id="cN">—</b> rpm</p>
+            <p class="formula">n = 1000 · Vc ÷ (π · D)</p>
+            <p class="calc-rec" id="cRec"></p>
+          </section>
+          <section>
+            <h3>Avanço e tempo de corte</h3>
+            <div class="calc-in">
+              <label>f <span>mm/rot</span><input id="cF" type="number" value="0.25" step="0.01" min="0"></label>
+              <label>n <span>rpm</span><input id="cN2" type="number" value="1270" min="0"></label>
+              <label>Curso L <span>mm</span><input id="cL" type="number" value="40" min="0"></label>
+            </div>
+            <p class="calc-out">Vf = <b id="cVf">—</b> mm/min · t = <b id="cT">—</b></p>
+            <p class="formula">Vf = f · n &nbsp;·&nbsp; t = L ÷ Vf</p>
+          </section>
+          <section>
+            <h3>Rugosidade teórica</h3>
+            <div class="calc-in">
+              <label>f <span>mm/rot</span><input id="cRf" type="number" value="0.12" step="0.01" min="0"></label>
+              <label>Raio da ponta <span>mm</span><input id="cRe" type="number" value="0.4" step="0.1" min="0.05"></label>
+            </div>
+            <p class="calc-out">Rt ≈ <b id="cRt">—</b> µm · Ra ≈ <b id="cRa">—</b> µm</p>
+            <p class="formula">Rt = f² ÷ (8 · rε) · 1000 &nbsp;·&nbsp; Ra ≈ Rt ÷ 4</p>
+          </section>
+          <section>
+            <h3>Rosca métrica externa</h3>
+            <div class="calc-in">
+              <label>Ø nominal <span>mm</span><input id="cRD" type="number" value="24" step="0.5" min="1"></label>
+              <label>Passo <span>mm</span><input id="cRP" type="number" value="2" step="0.25" min="0.2"></label>
+            </div>
+            <p class="calc-out">h = <b id="cRh">—</b> mm · núcleo Ø<b id="cRd3">—</b></p>
+            <p class="formula">h = 0,6134 · P &nbsp;·&nbsp; d3 = D − 2h</p>
+            <button class="btn btn-sm" id="cRIns" type="button">Inserir G76 no programa</button>
+          </section>
+        </div>
+      </div>
+
+      <div class="aba" id="aba-codigos" role="tabpanel" hidden></div>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="modalAjuda" hidden>
+  <div class="modal-caixa" role="dialog" aria-modal="true" aria-labelledby="ajudaTit">
+    <div class="modal-cab"><h2 id="ajudaTit">Como usar o TornoLab</h2><button class="btn btn-sm" id="ajudaFechar" type="button">Fechar</button></div>
+    <div class="modal-corpo">
+      <ol class="passos">
+        <li><b>Escolha um exemplo</b> ou escreva o programa no editor. O painel “Leitura do bloco” explica cada palavra da linha onde está o cursor.</li>
+        <li>Clique em <b>Verificar</b> para achar erros de sintaxe e ver o tempo estimado de ciclo.</li>
+        <li>Pressione <b>Ciclo início</b> (Ctrl+Enter). Use <b>Bloco a bloco</b> para executar uma linha por vez e <b>Parada</b> (Esc) para segurar o avanço.</li>
+        <li>Se aparecer um <b>alarme</b>, leia a mensagem, corrija a linha indicada e pressione <b>Reset</b>.</li>
+      </ol>
+      <h3>Convenções desta máquina</h3>
+      <ul class="lista">
+        <li>Torno de <b>torre traseira</b>: X para cima, Z para a direita (contraponta). <b>G02</b> é horário e <b>G03</b> anti-horário na tela.</li>
+        <li><b>X é diâmetro</b>. U e W são incrementais. O zero-peça fica no centro da face acabada.</li>
+        <li>Padrão Fanuc sistema A: <b>G90</b> é ciclo de torneamento (não “absoluto”). Em G74/G75/G76, P e Q sem ponto decimal são em <b>micrômetros</b>.</li>
+        <li>Bedames têm a referência no <b>canto esquerdo</b> da lâmina. Brocas trabalham em X0.</li>
+        <li>Ponto de referência (G28) em X120 Z120, ou mais longe em barras grossas. Posição usual de troca: G00 X100. Z100.</li>
+      </ul>
+      <h3>Na vista 2D</h3>
+      <ul class="lista">
+        <li>Metade de cima em <b>corte</b> (hachurada), metade de baixo em <b>vista</b>. Linha tracejada clara: contorno da peça bruta.</li>
+        <li>Traço laranja tracejado = G00. Ciano = corte. Rosa = rosca. Role para aproximar, arraste para mover, duplo clique para enquadrar a peça.</li>
+      </ul>
+      <p class="nota">Simulação didática: não substitui o manual do comando nem a verificação na máquina real.</p>
+    </div>
+  </div>
+</div>
+
+<script src="js/dados.js"></script>
+<script src="js/interpretador.js"></script>
+<script src="js/material.js"></script>
+<script src="js/simulacao.js"></script>
+<script src="js/vista2d.js"></script>
+<script src="js/vista3d.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
